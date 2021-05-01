@@ -44,13 +44,49 @@ void Cylinder::draw_gl() const {
 bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
   // AC
 
-  // Transformer le rayon pour tester l'intersection avec un cube centré en
-  // (0,0,0) (utilisation de inv_transfo)
+    Vec3 o = Vec3(this->inv_transfo*Vec4(Origin.x, Origin.y, Origin.z, 1));
+    Vec3 d = Vec3(this->inv_transfo*Vec4(Dir.x, Dir.y, Dir.z, 1));
 
-  // Tester l'intersection avec les 6 faces
+    float ax = (-1-o.x)/d.x;
+    float ay = (-1-o.y)/d.y;
+    float az = (-1-o.z)/d.z;
+    float bx = ( 1-o.x)/d.x;
+    float by = ( 1-o.y)/d.y;
+    float bz = ( 1-o.z)/d.z;
 
-  // Retransformer le point d'intersection pour le ramener dans la scène
-  // (utilisation de transfo)
+    if (ax > bx) {
+        ax = ax+bx;
+        bx = ax-bx;
+        ax = ax-bx;
+    }
+    if (ay > by) {
+        ay = ay+by;
+        by = ay-by;
+        ay = ay-by;
+    }
+    if (ax>by || ay>bx)
+        return false;
+    if (ay > ax)
+        ax = ay;
+    if (by < bx)
+        bx = by;
+    if (az > bz) {
+        az = az+bz;
+        bz = az-bz;
+        az = az-bz;
+    }
+    if (ax>bz || az>bx)
+        return false;
+    if (az > ax)
+        ax = az;
+    if (bz < bx)
+        bx = bz;
+
+    I->node = this;
+    /*I->Dir
+    I->Pos
+    I->a_min*/
+    return true;
 }
 
 /*
@@ -59,11 +95,16 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
  */
 Vec3 Cube::normal(const Vec3 &P) {
   // AC. Pensez à normaliser la normale une fois le vecteur calculé.
+    return Vec3(0,0,0);
+    Vec3 r(0,0,0);
+    Vec3 p = Vec3(this->inv_transfo*Vec4(P.x, P.y, P.z, 1));
 
   // Calcul de la normale avec un cube centré en (0,0,0) (utilisation de
   // inv_transfo)
-
+    //Vec3 N = Vec3(((P.x == 1) || (P.x == -1))?P.x:0,((P.y == 1) || (P.y == -1))?P.y:0,((P.z == 1) || (P.z == -1))?P.z:0); abs(a-b) < epsilon
   // Un ramène la normale dans la scène (utilisation de transfo)
+    //normalize(I.node->transfo * Vec4(N, 1.0) -P); P = pt d'inter, N = normale dans le repère avant transfo
+        return normalize(Vec3(this->transfo*Vec4(r,1)));
 }
 
 /*
@@ -72,9 +113,31 @@ Vec3 Cube::normal(const Vec3 &P) {
  * I : Informations sur le point d'intersection
  * return true en cas d'intersection
  */
-bool Sphere::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
+bool Sphere::intersecte(const Vec3 &O, const Vec3 &D, Inter *I) {
   // AC
-  // Meme principe que pour le cube
+    Vec3 o = Vec3(this->inv_transfo*Vec4(O.x, O.y, O.z, 1));
+    Vec3 d = Vec3(this->inv_transfo*Vec4(D.x, D.y, D.z, 1));
+    float a = d.x*d.x + d.y*d.y + d.z*d.z;
+    float b = 2*(o.x*d.x + o.y*d.y + o.z*d.z);
+    float c = o.x*o.x + o.y*o.y + o.z*o.z - 1.f;
+    float delta = b*b - 4.f*(a*c);
+    float r, r1;
+    //std::cout << delta;
+    if (delta<=-Epsilon)
+        return false;
+    if (delta > -Epsilon && delta < Epsilon) {
+        r = -(b)/(2*a);
+    } else {
+        r1 = (-b)+sqrt(delta)/(2*a);
+        r = (-b)-sqrt(delta)/(2*a);
+        if (r1 > -Epsilon && (r <= -Epsilon || r1 < r))
+            r = r1;
+    }
+    I->Pos = Vec3(Vec4(d.x*r+o.x, d.y*r+o.y, d.z*r+o.z, 1)*this->transfo);
+    I->Dir = normal(I->Pos);
+    I->node = this;
+    I->a_min = sqrt(pow(I->Pos.x-o.x, 2) + pow(I->Pos.y-o.y, 2) + pow(I->Pos.z-o.z, 2));
+    return true;
 }
 
 /*
@@ -84,6 +147,7 @@ bool Sphere::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
 Vec3 Sphere::normal(const Vec3 &P) {
   // AC
   // Meme principe que pour le cube
+    return normalize(P);
 }
 
 /*
@@ -95,6 +159,7 @@ Vec3 Sphere::normal(const Vec3 &P) {
 bool Cylinder::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
   // AC
   // Meme principe que pour le cube
+    return false;
 }
 
 /*
@@ -111,7 +176,13 @@ Vec3 Cylinder::normal(const Vec3 &P) {
  *  ////////////////// BVH //////////////////
  *  /////////////////////////////////////////
  */
-
+float BVH::norme(Vec3 a, Vec3 b) {
+    float x, y, z;
+    x = a.x-b.x;
+    y = a.y-b.y;
+    z = a.z-b.z;
+    return sqrt(x*x + y*y + z*z);
+}
 /*
  * Origin : l'origine du rayon
  * Dir : la direction du rayon
@@ -123,6 +194,28 @@ void BVH::closestIntersection(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
   // avec les boites englobante des noeuds intermédiaires du BVH puis les primitives (Nodes) sur les feuilles
   // On cherche l'intersection LA PLUS PROCHE de l'origine du rayon !
   // On stocke les informations d'intersection dans la struct Inter I
+    Inter tmp;
+    //if (!Cube(this->transfo, BLANC, 1, 1).intersecte(Origin, Dir, &tmp))
+    //    return;
+    for (auto node : this->nodes) {
+        if (node->intersecte(Origin, Dir, &tmp)
+        &&  (I->node == nullptr || norme(tmp.Pos, Origin) < norme(I->Pos, Origin))) {
+            I->Dir = tmp.Dir;
+            I->Pos = tmp.Pos;
+            I->node = tmp.node;
+            I->a_min = tmp.a_min;
+        }
+    }
+    for (auto b : this->children) {
+        b->closestIntersection(Origin, Dir, &tmp);
+        if (tmp.node != nullptr
+        && (I->node == nullptr || norme(tmp.Pos, Origin) < norme(I->Pos, Origin))) {
+            I->Dir = tmp.Dir;
+            I->Pos = tmp.Pos;
+            I->node = tmp.node;
+            I->a_min = tmp.a_min;
+        }
+    }
 }
 
 /*
@@ -143,6 +236,11 @@ void BVH::intersecteShadow(const Vec3 &Origin, const Vec3 &Dir, float &sha) {
   // et on continue le test si celui n'a pas atteint une valeur de 1.0 !
 
   // On met à jour le coefficient d'ombre sha pris en paramètre si il y a des intersections et selon le coefficient de transparence des objet intersectés.
+    // tant que sha <1.0
+    // if (!inter) sha = 0.0
+    // else if(inter.prim.transp == 0) return sha=1.0
+    // else sha += 1.0 - transp;
+    // (1-sha) * coeff * max(0, No . Lu))
 }
 
 const float Node::Epsilon = 0.0001f;
@@ -170,6 +268,8 @@ void RTracer::add_cylinder_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
   b->nodes.push_back(new Cylinder(m, color, spec, tr));
   // DC
 }
+
+// TODO hiérarchiser la structure dans le bvh
 void RTracer::add_sponge_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
                                float spec, float tr, int r) {
     float multiplier = 2./3.+0.1;
@@ -191,10 +291,11 @@ void RTracer::add_sponge_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
         add_sponge_bvh(b, m*translate(i, 0, -multiplier)*scale(taille), color, spec, tr, r-1);
     }
     multiplier*=3;
+
     for(float i=-multiplier; i<=multiplier; i+=multiplier*2) {
-        add_sphere_bvh(b, m*scale(taille)*translate(i, 0, 0), color, spec, tr);
-        add_sphere_bvh(b, m*scale(taille)*translate(0, i, 0), color, spec, tr);
-        add_sphere_bvh(b, m*scale(taille)*translate(0, 0, i), color, spec, tr);
+        add_sphere_bvh(b, m*scale(taille)*translate(i, 0, 0), color, spec, 1);
+        add_sphere_bvh(b, m*scale(taille)*translate(0, i, 0), color, spec, 1);
+        add_sphere_bvh(b, m*scale(taille)*translate(0, 0, i), color, spec, 1);
     }
 }
 
@@ -264,7 +365,7 @@ Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
 
     return Color(final);
   }
-  return Vec3(0, 0, 0);
+  return GRIS;
 }
 
 QLabel *RTracer::CalcImage(int depth) {

@@ -24,11 +24,11 @@ int main(int argc, char *argv[])
 	{
         Node::prim.gl_init();
         rt.bvh = new BVH(Mat4());
-        //rt.add_sponge_bvh(rt.bvh, Mat4(), BLEU, 0, 1, 0);
+        rt.add_sponge_bvh(rt.bvh, translate(0,0,-1.2)*scale(10, 10, 0.1), ROUGE, 0, 1, 0);
+        rt.add_sphere_bvh(rt.bvh, translate(3,1,0), ROUGE, 0, 1);
         //rt.add_sponge_bvh(rt.bvh, Mat4(), BLANC, 0, 1, 1);
-        rt.add_sponge_bvh(rt.bvh, Mat4(translate(0,0,0.5))*scale(3), ROUGE, 0, 1, 3);
-        rt.add_cylinder_bvh(rt.bvh, Mat4(translate(0,0,-3))*scale(10, 10, 0.1), GRIS, 0, 1);
-	};
+        //rt.add_sponge_bvh(rt.bvh, translate(0,0,0.5)*scale(3), ROUGE, 1, 0, 3);
+    };
 
 
 
