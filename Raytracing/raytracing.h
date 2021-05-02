@@ -131,6 +131,7 @@ public:
                         float tr);
   void add_sponge_bvh(BVH *b, const Mat4 &m, const Vec3 &color, float spec,
                       float tr, int r);
+  void add_apoll_bvh(BVH *b, const Mat4 &m, const Vec3 &color, int r);
 
   QLabel *CalcImage(int depth); // calcule l'image par lancer de rayons. Renvoie
                                 // de quoi l'afficher.

@@ -202,10 +202,10 @@ void BVH::closestIntersection(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
     Inter test, tmp;
 
     // il faudrait initialiser les matrices de transformation englobantes
-    /*
+/*
       if (!Cube(this->transfo, BLANC, 1, 1).intersecte(Origin, Dir, &test))
         return;
-    */
+*/
 
     for (auto b : this->children)
         b->closestIntersection(Origin, Dir, I);
@@ -289,26 +289,26 @@ void RTracer::add_cylinder_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
   // DC
 }
 
-// TODO hiérarchiser la structure dans le bvh
-void RTracer::add_sponge_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
+void RTracer::add_sponge_bvh(BVH *B, const Mat4 &m, const Vec3 &color,
                                float spec, float tr, int r) {
+    B->add_child(m);
+    BVH* b = B;
     float multiplier = 2./3.+0.1;
     float taille = 1./3.;
     if (r == 0) {
-        //draw cube and sphere
         add_cube_bvh(b, m, color, spec, tr);
         return;
     }
     for (float i=-multiplier; i<=multiplier;i+=multiplier)
         for (float j=-multiplier; j<=multiplier; j+=multiplier*2)
             for (float k=-multiplier; k<=multiplier; k+=multiplier*2)
-                add_sponge_bvh(b->add_child(Mat4()), m*translate(i, j, k)*scale(taille), color, spec, tr, r-1);
+                add_sponge_bvh(b, m*translate(i, j, k)*scale(taille), color, spec, tr, r-1);
 
     for (float i=-multiplier; i<=multiplier; i+=multiplier*2) {
-        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, multiplier, 0)*scale(taille), color, spec, tr, r-1);
-        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, -multiplier, 0)*scale(taille), color, spec, tr, r-1);
-        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, 0, multiplier)*scale(taille), color, spec, tr, r-1);
-        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, 0, -multiplier)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b, m*translate(i, multiplier, 0)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b, m*translate(i, -multiplier, 0)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b, m*translate(i, 0, multiplier)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b, m*translate(i, 0, -multiplier)*scale(taille), color, spec, tr, r-1);
     }
     multiplier*=3;
 
@@ -319,6 +319,24 @@ void RTracer::add_sponge_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
     }
 }
 
+void RTracer::add_apoll_bvh(BVH *B, const Mat4 &m, const Vec3 &color, int r) {
+
+    B->add_child(m);
+    BVH* b = B;
+    float multiplier = 2;
+    float taille = 1./2.;
+
+    if (r == 0) {
+        add_sphere_bvh(b, m, color, 0.5, 0);
+        return;
+    }
+    add_apoll_bvh(b, m*scale(taille)*translate(multiplier, 0, 0), color, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, multiplier, 0), color, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, 0, multiplier), color, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(-multiplier, 0, 0), color, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, -multiplier, 0), color, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, 0, -multiplier), color, r-1);
+}
 Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
   Inter I;
   I.a_min = std::numeric_limits<float>::max();
@@ -385,7 +403,7 @@ Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
 
     return Color(final);
   }
-  return BLANC;
+  return GRIS;
 }
 
 QLabel *RTracer::CalcImage(int depth) {
