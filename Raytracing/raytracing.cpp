@@ -152,8 +152,7 @@ bool Sphere::intersecte(const Vec3 &O, const Vec3 &D, Inter *I) {
 Vec3 Sphere::normal(const Vec3 &P) {
   // AC
   // Meme principe que pour le cube
-    Vec3 p = Vec3(this->inv_transfo*Vec4(P, 1));
-    return normalize(Vec3(this->transfo*Vec4(p, 1)));
+    return normalize(P);
 }
 
 /*
