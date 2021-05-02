@@ -343,7 +343,7 @@ Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
     // Shadow
     float sha = 0.0f;
     // AC : calculer le coefficient d'ombre
-    bvh->intersecteShadow(No, Lu, sha);
+    bvh->intersecteShadow(Po, Lu, sha);
 
     // Lambert (diffuse) BRDF
     float lambert = (1-sha) * I.node->spec * fmax(0, No.x*Lu.x + No.y*Lu.y + No.z*Lu.z);
