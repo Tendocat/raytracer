@@ -24,8 +24,16 @@ int main(int argc, char *argv[])
 	{
         Node::prim.gl_init();
         rt.bvh = new BVH(Mat4());
-        rt.add_sponge_bvh(rt.bvh, translate(0,0,-1.2)*scale(10, 10, 0.1), ROUGE, 0, 1, 0);
-        rt.add_sphere_bvh(rt.bvh, translate(3,1,0), ROUGE, 0, 1);
+        rt.add_sphere_bvh(rt.bvh, translate(-2,0,0), ROUGE, 0, 0);
+        rt.add_sphere_bvh(rt.bvh, translate(0,2,0), BLEU, 1, 0);
+        rt.add_sphere_bvh(rt.bvh, translate(0,-2,0), JAUNE, 0, 1);
+        rt.add_sphere_bvh(rt.bvh, translate(2,0,0), CYAN, 1, 1);
+        //rt.add_cube_bvh(rt.bvh, Mat4(), ROUGE, 1, 0);
+        //rt.add_sponge_bvh(rt.bvh, translate(0,0,-1.2)*scale(10, 10, 0.1), ROUGE, 0, 1, 0);
+        //rt.add_sponge_bvh(rt.bvh, Mat4(), BLANC, 1, 0, 1);
+        //rt.add_sponge_bvh(rt.bvh, translate(-1.7,-1.7,0), ROUGE, 0, 1, 0);
+        //rt.add_sphere_bvh(rt.bvh, translate(1.7,1.7,0), BLEU, 1, 1);
+        //rt.add_sphere_bvh(rt.bvh, translate(0,1.7,0), ROUGE, 1, 1);
         //rt.add_sponge_bvh(rt.bvh, Mat4(), BLANC, 0, 1, 1);
         //rt.add_sponge_bvh(rt.bvh, translate(0,0,0.5)*scale(3), ROUGE, 1, 0, 3);
     };

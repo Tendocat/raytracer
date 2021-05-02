@@ -44,8 +44,8 @@ void Cylinder::draw_gl() const {
 bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
   // AC
 
-    Vec3 o = Vec3(this->inv_transfo*Vec4(Origin.x, Origin.y, Origin.z, 1));
-    Vec3 d = Vec3(this->inv_transfo*Vec4(Dir.x, Dir.y, Dir.z, 1));
+    Vec3 o = Vec3(this->inv_transfo*Vec4(Origin, 1));
+    Vec3 d = Vec3(this->inv_transfo*Vec4(Dir, 1));
 
     float ax = (-1-o.x)/d.x;
     float ay = (-1-o.y)/d.y;
@@ -81,11 +81,17 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
         ax = az;
     if (bz < bx)
         bx = bz;
+    if (BVH::norme(Vec3(ax, 0, 0), o) > BVH::norme(Vec3(bx, 0, 0), o))
+        ax = bx;
+    if (BVH::norme(Vec3(0, ay, 0), o) > BVH::norme(Vec3(0, by, 0), o))
+        ay = by;
+    if (BVH::norme(Vec3(0, 0, az), o) > BVH::norme(Vec3(0, 0, bz), o))
+        az = bz;
 
+    I->Pos = Vec3(this->transfo*Vec4(ax, ay, az, 1));
+    I->Dir = normal(I->Pos);
     I->node = this;
-    /*I->Dir
-    I->Pos
-    I->a_min*/
+    I->a_min = BVH::norme(I->Pos, o);
     return true;
 }
 
@@ -93,18 +99,17 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
  * P : point sur l'objet auquel on veut calculer la normale
  * retourne la normal normalisé
  */
-Vec3 Cube::normal(const Vec3 &P) {
+Vec3 Cube::normal(const Vec3 &p) {
   // AC. Pensez à normaliser la normale une fois le vecteur calculé.
-    return Vec3(0,0,0);
     Vec3 r(0,0,0);
-    Vec3 p = Vec3(this->inv_transfo*Vec4(P.x, P.y, P.z, 1));
-
-  // Calcul de la normale avec un cube centré en (0,0,0) (utilisation de
-  // inv_transfo)
-    //Vec3 N = Vec3(((P.x == 1) || (P.x == -1))?P.x:0,((P.y == 1) || (P.y == -1))?P.y:0,((P.z == 1) || (P.z == -1))?P.z:0); abs(a-b) < epsilon
-  // Un ramène la normale dans la scène (utilisation de transfo)
-    //normalize(I.node->transfo * Vec4(N, 1.0) -P); P = pt d'inter, N = normale dans le repère avant transfo
-        return normalize(Vec3(this->transfo*Vec4(r,1)));
+    Vec3 P = Vec3(this->inv_transfo*Vec4(p, 1));
+    if (isEqual(P.x, 1) || isEqual(P.x, -1))
+        r.x = P.x;
+    else if (isEqual(P.y, 1) || isEqual(P.y, -1))
+        r.y = P.y;
+    else if (isEqual(P.z, 1) || isEqual(P.z, -1))
+        r.z = P.z;
+    return normalize(Vec3(this->transfo*Vec4(r,1)));
 }
 
 /*
@@ -133,10 +138,10 @@ bool Sphere::intersecte(const Vec3 &O, const Vec3 &D, Inter *I) {
         if (r1 > -Epsilon && (r <= -Epsilon || r1 < r))
             r = r1;
     }
-    I->Pos = Vec3(Vec4(d.x*r+o.x, d.y*r+o.y, d.z*r+o.z, 1)*this->transfo);
+    I->Pos = Vec3(this->transfo*Vec4(d.x*r+o.x, d.y*r+o.y, d.z*r+o.z, 1));
     I->Dir = normal(I->Pos);
     I->node = this;
-    I->a_min = sqrt(pow(I->Pos.x-o.x, 2) + pow(I->Pos.y-o.y, 2) + pow(I->Pos.z-o.z, 2));
+    I->a_min = BVH::norme(I->Pos, o);
     return true;
 }
 
@@ -147,7 +152,8 @@ bool Sphere::intersecte(const Vec3 &O, const Vec3 &D, Inter *I) {
 Vec3 Sphere::normal(const Vec3 &P) {
   // AC
   // Meme principe que pour le cube
-    return normalize(P);
+    Vec3 p = Vec3(this->inv_transfo*Vec4(P, 1));
+    return normalize(Vec3(this->transfo*Vec4(p, 1)));
 }
 
 /*
@@ -194,22 +200,20 @@ void BVH::closestIntersection(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
   // avec les boites englobante des noeuds intermédiaires du BVH puis les primitives (Nodes) sur les feuilles
   // On cherche l'intersection LA PLUS PROCHE de l'origine du rayon !
   // On stocke les informations d'intersection dans la struct Inter I
-    Inter tmp;
-    //if (!Cube(this->transfo, BLANC, 1, 1).intersecte(Origin, Dir, &tmp))
-    //    return;
+    Inter test, tmp;
+
+    // il faudrait initialiser les matrices de transformation englobantes
+    /*
+      if (!Cube(this->transfo, BLANC, 1, 1).intersecte(Origin, Dir, &test))
+        return;
+    */
+
+    for (auto b : this->children)
+        b->closestIntersection(Origin, Dir, I);
+
     for (auto node : this->nodes) {
         if (node->intersecte(Origin, Dir, &tmp)
-        &&  (I->node == nullptr || norme(tmp.Pos, Origin) < norme(I->Pos, Origin))) {
-            I->Dir = tmp.Dir;
-            I->Pos = tmp.Pos;
-            I->node = tmp.node;
-            I->a_min = tmp.a_min;
-        }
-    }
-    for (auto b : this->children) {
-        b->closestIntersection(Origin, Dir, &tmp);
-        if (tmp.node != nullptr
-        && (I->node == nullptr || norme(tmp.Pos, Origin) < norme(I->Pos, Origin))) {
+        && (I->node == nullptr || tmp.a_min < I->a_min)) {
             I->Dir = tmp.Dir;
             I->Pos = tmp.Pos;
             I->node = tmp.node;
@@ -222,7 +226,6 @@ void BVH::closestIntersection(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
  * Origin : l'origine du rayon (de la lumière)
  * Dir : la direction du rayon (de la lumière)
  * sha : coefficient d'ombre (entre 0.0 et 1.0)
- * return true en cas d'intersection
  */
 void BVH::intersecteShadow(const Vec3 &Origin, const Vec3 &Dir, float &sha) {
   // AC
@@ -236,7 +239,25 @@ void BVH::intersecteShadow(const Vec3 &Origin, const Vec3 &Dir, float &sha) {
   // et on continue le test si celui n'a pas atteint une valeur de 1.0 !
 
   // On met à jour le coefficient d'ombre sha pris en paramètre si il y a des intersections et selon le coefficient de transparence des objet intersectés.
-    // tant que sha <1.0
+
+    Inter I;
+
+    for (auto node : this->nodes) {
+        if (!node->intersecte(Origin, Dir, &I))
+            continue;
+        else if (I.node->transp == 0)
+            sha = 1.0f;
+        else
+            sha += 1.0 - I.node->transp;
+
+        if (sha >= 1.0f)
+            break;
+    }
+    for (auto b : this->children) {
+        b->intersecteShadow(Origin, Dir, sha);
+        if (sha >= 1.0f)
+            break;
+    }
     // if (!inter) sha = 0.0
     // else if(inter.prim.transp == 0) return sha=1.0
     // else sha += 1.0 - transp;
@@ -282,13 +303,13 @@ void RTracer::add_sponge_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
     for (float i=-multiplier; i<=multiplier;i+=multiplier)
         for (float j=-multiplier; j<=multiplier; j+=multiplier*2)
             for (float k=-multiplier; k<=multiplier; k+=multiplier*2)
-                add_sponge_bvh(b, m*translate(i, j, k)*scale(taille), color, spec, tr, r-1);
+                add_sponge_bvh(b->add_child(Mat4()), m*translate(i, j, k)*scale(taille), color, spec, tr, r-1);
 
     for (float i=-multiplier; i<=multiplier; i+=multiplier*2) {
-        add_sponge_bvh(b, m*translate(i, multiplier, 0)*scale(taille), color, spec, tr, r-1);
-        add_sponge_bvh(b, m*translate(i, -multiplier, 0)*scale(taille), color, spec, tr, r-1);
-        add_sponge_bvh(b, m*translate(i, 0, multiplier)*scale(taille), color, spec, tr, r-1);
-        add_sponge_bvh(b, m*translate(i, 0, -multiplier)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, multiplier, 0)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, -multiplier, 0)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, 0, multiplier)*scale(taille), color, spec, tr, r-1);
+        add_sponge_bvh(b->add_child(Mat4()), m*translate(i, 0, -multiplier)*scale(taille), color, spec, tr, r-1);
     }
     multiplier*=3;
 
@@ -312,20 +333,20 @@ Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
     // Position
     Vec3 Po = I.Pos;
 
-    // Light direction
-    Vec3 Lu = Vec3(0, 0, 0);
-    // AC : calculer Lu, la direction de la lumière
-
-    // Normal
     Vec3 No = I.node->normal(Po);
+
+    // Light direction
+    Vec3 Lu = (2*(D.x*No.x + D.y*No.y + D.z*No.z)*No)-D;
+    // AC : calculer Lu, la direction de la lumière
+    // Normal
 
     // Shadow
     float sha = 0.0f;
     // AC : calculer le coefficient d'ombre
+    bvh->intersecteShadow(No, Lu, sha);
 
     // Lambert (diffuse) BRDF
-    float lambert = 0.0f;
-    // AC : calculer la diffusion de l'objet avec -> (1 - sha) * col ∗ coeff ∗ max(0, No · Lu)
+    float lambert = (1-sha) * I.node->spec * fmax(0, No.x*Lu.x + No.y*Lu.y + No.z*Lu.z);
 
     // ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // La suite est déjà complétée, il sagit d'autres comportements de la lumière et des objets : spécularité, transparence et réflexions

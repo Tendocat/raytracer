@@ -48,6 +48,10 @@ public:
                                           // (modifier contenu de I).
   virtual Vec3 normal(const Vec3 &P) = 0; // la normale à la primitive
 
+  inline bool isEqual(float a, float b) {
+    return abs(a-b) < Epsilon;
+  }
+
   static Primitives prim;
 };
 
@@ -105,7 +109,7 @@ public:
   // Parcours du BVH pour calculer les ombres. Ici le rayon attendu à pour origine un point d'intersection
   // d'un rayon primaire sur une primitive, et une direction vers la source lumineuse
   void intersecteShadow(const Vec3 &Origin, const Vec3 &Dir, float &sha);
-  float norme(Vec3 a, Vec3 b);
+  static float norme(Vec3 a, Vec3 b);
 };
 
 class RTracer {
