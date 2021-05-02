@@ -385,7 +385,7 @@ Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
 
     return Color(final);
   }
-  return GRIS;
+  return BLANC;
 }
 
 QLabel *RTracer::CalcImage(int depth) {
