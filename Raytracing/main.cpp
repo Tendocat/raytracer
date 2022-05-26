@@ -23,24 +23,19 @@ int main(int argc, char *argv[])
 	viewer.f_init = [&] ()
 	{
         Node::prim.gl_init();
-        rt.bvh = new BVH(Mat4());
+        rt.bvh = new BVH(scale(1000));
         float MAX = 5;
-        Mat4 grille = translate(-4, 4, 0)* scale(0.5);
-        for (float tr=0; tr<MAX+0.01f; tr+=1) {
+        Mat4 grille = translate(0, 5, 0)*rotateX(90)* scale(0.5);
+        for (float tr=MAX; tr>0; tr-=1) {
             for (float spec=0; spec<MAX+0.01f; spec+=1) {
                 rt.add_sphere_bvh(rt.bvh, grille*translate(tr*2-MAX,spec*2-MAX,0), ROUGE, spec/MAX, tr/MAX);
             }
         }
-        grille = translate(4, 4, 0)* scale(0.5);
-        for (float tr=0; tr<MAX+0.01f; tr+=1) {
-            for (float spec=0; spec<MAX+0.01f; spec+=1) {
-                rt.add_cube_bvh(rt.bvh, grille*translate(tr*2-MAX,spec*2-MAX,0), ROUGE, spec/MAX, tr/MAX);
-            }
-        }
+        rt.add_apoll_bvh(rt.bvh, translate(-4,0,2)*scale(2.5), ROUGE, 2);
+        rt.add_sphere_bvh(rt.bvh, translate(0, -6,0)*scale(5, 1, 5), BLANC, 1, 0.4);
 
-        // you can increase the recursion which is the last arg but don't ray cast as it's very long
-        rt.add_apoll_bvh(rt.bvh, translate(-4,-4,0)*scale(2.5), ROUGE, 2);
-        rt.add_sponge_bvh(rt.bvh, translate(4,-4,0)*scale(3), ROUGE, 1, 0, 2);
+        // you can increase the recursion which is the last arg but ray cast will be very long
+        rt.add_sponge_bvh(rt.bvh, translate(4,0,0)*scale(3), BLEU, 0, 0, 2);
     };
 
 

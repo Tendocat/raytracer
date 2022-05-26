@@ -49,7 +49,7 @@ public:
   virtual Vec3 normal(const Vec3 &P) = 0; // la normale à la primitive
 
   inline bool isEqual(float a, float b) {
-    return abs(a-b) < Epsilon;
+    return fabs(a-b) < Epsilon;
   }
 
   static Primitives prim;

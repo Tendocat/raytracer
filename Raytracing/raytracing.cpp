@@ -45,7 +45,7 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
   // AC
 
     Vec3 o = Vec3(this->inv_transfo*Vec4(Origin, 1));
-    Vec3 d = Vec3(this->inv_transfo*Vec4(Dir, 1));
+    Vec3 d = Vec3(this->inv_transfo*Vec4(Dir, 0));
 
     float ax = (-1-o.x)/d.x;
     float ay = (-1-o.y)/d.y;
@@ -53,16 +53,17 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
     float bx = ( 1-o.x)/d.x;
     float by = ( 1-o.y)/d.y;
     float bz = ( 1-o.z)/d.z;
+    float tmp;
 
     if (ax > bx) {
-        ax = ax+bx;
-        bx = ax-bx;
-        ax = ax-bx;
+        tmp = bx;
+        bx = ax;
+        ax = tmp;
     }
     if (ay > by) {
-        ay = ay+by;
-        by = ay-by;
-        ay = ay-by;
+        tmp = ay;
+        ay = by;
+        by = tmp;
     }
     if (ax>by || ay>bx)
         return false;
@@ -71,9 +72,9 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
     if (by < bx)
         bx = by;
     if (az > bz) {
-        az = az+bz;
-        bz = az-bz;
-        az = az-bz;
+        tmp = az;
+        az = bz;
+        bz = tmp;
     }
     if (ax>bz || az>bx)
         return false;
@@ -81,17 +82,11 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
         ax = az;
     if (bz < bx)
         bx = bz;
-    if (BVH::norme(Vec3(ax, 0, 0), o) > BVH::norme(Vec3(bx, 0, 0), o))
-        ax = bx;
-    if (BVH::norme(Vec3(0, ay, 0), o) > BVH::norme(Vec3(0, by, 0), o))
-        ay = by;
-    if (BVH::norme(Vec3(0, 0, az), o) > BVH::norme(Vec3(0, 0, bz), o))
-        az = bz;
 
     I->Pos = Vec3(this->transfo*Vec4(ax, ay, az, 1));
-    I->Dir = normal(I->Pos);
+    I->Dir = Dir;
     I->node = this;
-    I->a_min = BVH::norme(I->Pos, o);
+    I->a_min = BVH::norme(I->Pos, Origin);
     return true;
 }
 
@@ -102,13 +97,19 @@ bool Cube::intersecte(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
 Vec3 Cube::normal(const Vec3 &p) {
   // AC. Pensez à normaliser la normale une fois le vecteur calculé.
     Vec3 r(0,0,0);
-    Vec3 P = Vec3(this->inv_transfo*Vec4(p, 1));
-    if (isEqual(P.x, 1) || isEqual(P.x, -1))
-        r.x = P.x;
-    else if (isEqual(P.y, 1) || isEqual(P.y, -1))
-        r.y = P.y;
-    else if (isEqual(P.z, 1) || isEqual(P.z, -1))
-        r.z = P.z;
+    Vec3 P = normalize(Vec3(this->inv_transfo*Vec4(p, 0)));
+    if (isEqual(P.x, 1))
+        r.x = 1;
+    else if (isEqual(P.x, -1))
+        r.x = -1;
+    else if (isEqual(P.y, 1))
+        r.y = 1;
+    else if (isEqual(P.y, -1))
+        r.y = -1;
+    else if (isEqual(P.z, 1))
+        r.z = 1;
+    else if (isEqual(P.z, -1))
+        r.z = -1;
     return normalize(Vec3(this->transfo*Vec4(r,1)));
 }
 
@@ -120,28 +121,29 @@ Vec3 Cube::normal(const Vec3 &p) {
  */
 bool Sphere::intersecte(const Vec3 &O, const Vec3 &D, Inter *I) {
   // AC
-    Vec3 o = Vec3(this->inv_transfo*Vec4(O.x, O.y, O.z, 1));
-    Vec3 d = Vec3(this->inv_transfo*Vec4(D.x, D.y, D.z, 1));
-    float a = d.x*d.x + d.y*d.y + d.z*d.z;
-    float b = 2*(o.x*d.x + o.y*d.y + o.z*d.z);
-    float c = o.x*o.x + o.y*o.y + o.z*o.z - 1.f;
+    Vec3 o = Vec3(this->inv_transfo*Vec4(O, 1));
+    Vec3 d = Vec3(this->inv_transfo*Vec4(D, 0));
+    float a = glm::dot(d, d);
+    float b = 2*(glm::dot(o, d));
+    float c = glm::dot(o, o) - 1.f;
     float delta = b*b - 4.f*(a*c);
     float r, r1;
-    //std::cout << delta;
-    if (delta<=-Epsilon)
+    if (delta < 0)
         return false;
-    if (delta > -Epsilon && delta < Epsilon) {
+    else if (delta < Epsilon) {
         r = -(b)/(2*a);
     } else {
-        r1 = (-b)+sqrt(delta)/(2*a);
-        r = (-b)-sqrt(delta)/(2*a);
-        if (r1 > -Epsilon && (r <= -Epsilon || r1 < r))
+        r1 = ((-b)+sqrt(delta))/(2*a);
+        r = ((-b)-sqrt(delta))/(2*a);
+        if (r < -Epsilon || r1 < r) {
             r = r1;
+        }
+        if (r < Epsilon) return false;
     }
     I->Pos = Vec3(this->transfo*Vec4(d.x*r+o.x, d.y*r+o.y, d.z*r+o.z, 1));
-    I->Dir = normal(I->Pos);
+    I->Dir = D;
     I->node = this;
-    I->a_min = BVH::norme(I->Pos, o);
+    I->a_min = BVH::norme(I->Pos, O);
     return true;
 }
 
@@ -152,7 +154,7 @@ bool Sphere::intersecte(const Vec3 &O, const Vec3 &D, Inter *I) {
 Vec3 Sphere::normal(const Vec3 &P) {
   // AC
   // Meme principe que pour le cube
-    return normalize(P);
+    return normalize(Vec3(inv_transfo * Vec4(P,1)));
 }
 
 /*
@@ -182,11 +184,7 @@ Vec3 Cylinder::normal(const Vec3 &P) {
  *  /////////////////////////////////////////
  */
 float BVH::norme(Vec3 a, Vec3 b) {
-    float x, y, z;
-    x = a.x-b.x;
-    y = a.y-b.y;
-    z = a.z-b.z;
-    return sqrt(x*x + y*y + z*z);
+    return glm::length(a - b);
 }
 /*
  * Origin : l'origine du rayon
@@ -201,18 +199,18 @@ void BVH::closestIntersection(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
   // On stocke les informations d'intersection dans la struct Inter I
     Inter test, tmp;
 
-    // il faudrait initialiser les matrices de transformation englobantes
-/*
-      if (!Cube(this->transfo, BLANC, 1, 1).intersecte(Origin, Dir, &test))
-        return;
-*/
+    tmp.a_min = std::numeric_limits<float>::max();
+    tmp.node = nullptr;
+
+    if (!Cube(this->transfo, BLANC, 0, 0).intersecte(Origin, Dir, &test))
+    return;
 
     for (auto b : this->children)
         b->closestIntersection(Origin, Dir, I);
 
     for (auto node : this->nodes) {
         if (node->intersecte(Origin, Dir, &tmp)
-        && (I->node == nullptr || tmp.a_min < I->a_min)) {
+        && tmp.a_min < I->a_min) {
             I->Dir = tmp.Dir;
             I->Pos = tmp.Pos;
             I->node = tmp.node;
@@ -227,40 +225,19 @@ void BVH::closestIntersection(const Vec3 &Origin, const Vec3 &Dir, Inter *I) {
  * sha : coefficient d'ombre (entre 0.0 et 1.0)
  */
 void BVH::intersecteShadow(const Vec3 &Origin, const Vec3 &Dir, float &sha) {
-  // AC
-  // On parcours le BVH (structure d'arbre) en testant l'intersection avec le rayon (Origin et Dir en paramètres)
-  // avec les boites englobante des noeuds intermédiaires du BVH puis les primitives (Nodes) sur les feuilles
-  // Ici (contrairement à la fct BVH::intersecte()), on cherche juste si il y a intersection ou pas !
+    Inter test, I;
+    Vec3 O = Origin;
 
-  // Si il y a intersection alors le point d'origine est dans l'ombre car il y a un autre objet entre lui et la source de lumière.
-
-  // ATTENTION tout de même : si l'objet intersecté est transparent, on cumule son coefficient de transparence
-  // et on continue le test si celui n'a pas atteint une valeur de 1.0 !
-
-  // On met à jour le coefficient d'ombre sha pris en paramètre si il y a des intersections et selon le coefficient de transparence des objet intersectés.
-
-    Inter I;
-
-    for (auto node : this->nodes) {
-        if (!node->intersecte(Origin, Dir, &I))
-            continue;
-        else if (I.node->transp == 0)
-            sha = 1.0f;
-        else
+    do {
+        I.node = nullptr;
+        closestIntersection(O, Dir, &I);
+        if (I.node != nullptr) {
             sha += 1.0 - I.node->transp;
+            O = Vec3(Vec4(I.Pos, 1)*translate(Dir*0.001f));
+        }
+    } while(I.node != nullptr && sha < 1.0f);
 
-        if (sha >= 1.0f)
-            break;
-    }
-    for (auto b : this->children) {
-        b->intersecteShadow(Origin, Dir, sha);
-        if (sha >= 1.0f)
-            break;
-    }
-    // if (!inter) sha = 0.0
-    // else if(inter.prim.transp == 0) return sha=1.0
-    // else sha += 1.0 - transp;
-    // (1-sha) * coeff * max(0, No . Lu))
+    sha = clamp01(sha);
 }
 
 const float Node::Epsilon = 0.0001f;
@@ -291,10 +268,11 @@ void RTracer::add_cylinder_bvh(BVH *b, const Mat4 &m, const Vec3 &color,
 
 void RTracer::add_sponge_bvh(BVH *B, const Mat4 &m, const Vec3 &color,
                                float spec, float tr, int r) {
-    B->add_child(m);
-    BVH* b = B;
     float multiplier = 2./3.+0.1;
     float taille = 1./3.;
+    B->add_child(m*scale(2));
+    BVH* b = B->children.back();
+
     if (r == 0) {
         add_cube_bvh(b, m, color, spec, tr);
         return;
@@ -313,35 +291,35 @@ void RTracer::add_sponge_bvh(BVH *B, const Mat4 &m, const Vec3 &color,
     multiplier*=3;
 
     for(float i=-multiplier; i<=multiplier; i+=multiplier*2) {
-        add_sphere_bvh(b, m*scale(taille)*translate(i, 0, 0), color, spec, 1);
-        add_sphere_bvh(b, m*scale(taille)*translate(0, i, 0), color, spec, 1);
-        add_sphere_bvh(b, m*scale(taille)*translate(0, 0, i), color, spec, 1);
+        add_sphere_bvh(b, m*scale(taille)*translate(i, 0, 0), color, 1, 0);
+        add_sphere_bvh(b, m*scale(taille)*translate(0, i, 0), color, 1, 0);
+        add_sphere_bvh(b, m*scale(taille)*translate(0, 0, i), color, 1, 0);
     }
 }
 
 void RTracer::add_apoll_bvh(BVH *B, const Mat4 &m, const Vec3 &color, int r) {
 
-    B->add_child(m);
-    BVH* b = B;
     float multiplier = 2;
     float taille = 1./2.;
+    B->add_child(m*scale(2));
+    BVH* b = B->children.back();
 
     if (r == 0) {
-        add_sphere_bvh(b, m, color, 0.5, 0);
+        add_sphere_bvh(b, m, color, 0, 0.3);
         return;
     }
-    add_apoll_bvh(b, m*scale(taille)*translate(multiplier, 0, 0), color, r-1);
-    add_apoll_bvh(b, m*scale(taille)*translate(0, multiplier, 0), color, r-1);
-    add_apoll_bvh(b, m*scale(taille)*translate(0, 0, multiplier), color, r-1);
-    add_apoll_bvh(b, m*scale(taille)*translate(-multiplier, 0, 0), color, r-1);
-    add_apoll_bvh(b, m*scale(taille)*translate(0, -multiplier, 0), color, r-1);
-    add_apoll_bvh(b, m*scale(taille)*translate(0, 0, -multiplier), color, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(multiplier, 0, 0), BLEU, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, multiplier, 0), ROUGE, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, 0, multiplier), ROUGE2, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(-multiplier, 0, 0), VERT, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, -multiplier, 0), VERT2, r-1);
+    add_apoll_bvh(b, m*scale(taille)*translate(0, 0, -multiplier), JAUNE, r-1);
 }
+
 Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
   Inter I;
   I.a_min = std::numeric_limits<float>::max();
   I.node = nullptr;
-
   bvh->closestIntersection(Origin, Dir, &I);
 
   if (I.node != nullptr) {
@@ -350,20 +328,21 @@ Vec3 RTracer::ColorRayBVH(const Vec3 &Origin, const Vec3 &Dir, int rec) {
     // Position
     Vec3 Po = I.Pos;
 
-    Vec3 No = I.node->normal(Po);
-
     // Light direction
-    Vec3 Lu = (2*(D.x*No.x + D.y*No.y + D.z*No.z)*No)-D;
+    Vec3 Lu = normalize(this->posLum - Po);
     // AC : calculer Lu, la direction de la lumière
+
     // Normal
+    Vec3 No = I.node->normal(Po);
 
     // Shadow
     float sha = 0.0f;
     // AC : calculer le coefficient d'ombre
     bvh->intersecteShadow(Po, Lu, sha);
 
+    float coeff = 1.f;
     // Lambert (diffuse) BRDF
-    float lambert = (1-sha) * I.node->spec * fmax(0, No.x*Lu.x + No.y*Lu.y + No.z*Lu.z);
+    float lambert = (1-sha) * coeff * fmax(0, glm::dot(Lu, No));
 
     // ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // La suite est déjà complétée, il sagit d'autres comportements de la lumière et des objets : spécularité, transparence et réflexions
